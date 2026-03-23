@@ -2,24 +2,35 @@
 
 ## 1. 安装
 
-### 方式 A：从本仓库本地安装（推荐）
+推荐流程：先 `git clone`，再将项目安装为 `uv tool`。
+
+### 方式 A：clone 后安装为 uv tool（推荐）
 ```bash
-cd /home/jiangda/develop/rms3
-uv pip install ./agent-rms
+git clone <repo-url>
+cd agent-rms
+uv tool install .
 ```
 
-### 方式 B：开发模式安装
+安装完成后，推荐通过 `uvx` 调用：
 ```bash
-cd /home/jiangda/develop/rms3
-uv pip install -e ./agent-rms
+uvx agent-rms --help
 ```
 
-安装后可直接使用命令：
-```bash
-# 若已激活当前项目虚拟环境
-agent-rms --help
+说明：
+- `uv tool install .` 会把当前项目作为工具安装到独立环境中。
+- `uvx agent-rms ...` 是 `uv tool run` 的简写；若工具已安装，会优先复用已安装版本。
+- 如果本机 shell 已正确加入 uv 的工具目录，也可以直接执行 `agent-rms ...`，但对 Agent 来说更推荐统一使用 `uvx agent-rms ...`。
 
-# 若未激活虚拟环境（推荐）
+### 方式 B：直接从 Git 源安装为 uv tool
+```bash
+uv tool install git+<repo-url>
+uvx agent-rms --help
+```
+
+### 方式 C：开发调试
+```bash
+git clone <repo-url>
+cd agent-rms
 uv run agent-rms --help
 ```
 
@@ -47,7 +58,7 @@ export AGENT_RMS_CREDENTIALS_FILE=/path/to/credentials.json
 
 ### 登录
 ```bash
-agent-rms auth login \
+uvx agent-rms auth login \
   --username trader1 \
   --password '******' \
   --api-base-url http://103.47.83.123:8060 \
@@ -58,13 +69,13 @@ agent-rms auth login \
 
 ### 查看状态
 ```bash
-agent-rms auth status
-agent-rms auth whoami
+uvx agent-rms auth status
+uvx agent-rms auth whoami
 ```
 
 ### 退出（删除当前 profile 凭证）
 ```bash
-agent-rms auth logout
+uvx agent-rms auth logout
 ```
 
 ## 4. 市场数据（market）
@@ -72,39 +83,44 @@ agent-rms auth logout
 默认输出为终端友好的表格，支持 `--output json`。
 
 ```bash
-agent-rms market all
-agent-rms market future
-agent-rms market swap
-agent-rms market future_curve
-agent-rms market swap_curve
-agent-rms market asw_curve
+uvx agent-rms market all
+uvx agent-rms market future
+uvx agent-rms market swap
+uvx agent-rms market future_curve
+uvx agent-rms market swap_curve
+uvx agent-rms market asw_curve
 ```
 
 JSON 输出示例：
 ```bash
-agent-rms market asw_curve --output json
+uvx agent-rms market asw_curve --output json
 ```
 
 ## 5. 历史数据（history）
 
-### 期货历史（future_curve）
+`history` 返回的是曲线利差历史，而不是底层单个合约的原始历史点位。
+
+### 期货曲线利差历史（future_curve）
 ```bash
-agent-rms history \
+uvx agent-rms history \
   --type future_curve \
-  --symbol T \
+  --pair TxTL \
   --start-time 2026-03-01T00:00:00Z \
   --end-time 2026-03-10T00:00:00Z
 ```
 
-### 互换曲线历史（swap_curve）
+若不传 `--pair`，会返回全部期货利差对；可选值包括 `TSxTF`、`TSxT`、`TSxTL`、`TFxT`、`TFxTL`、`TxTL`。
+
+### 互换曲线利差历史（swap_curve）
 ```bash
-agent-rms history \
+uvx agent-rms history \
   --type swap_curve \
-  --curve FR007 \
-  --quote-type mid \
+  --pair 1x5 \
   --start-date 2026-03-01 \
   --end-date 2026-03-10
 ```
+
+若不传 `--pair`，会返回全部互换利差对；当前支持 `1x2`、`1x5`、`2x5`。底层数据源仍通过 `--curve` 和 `--quote-type` 控制，默认是 `FR007` + `mid`。
 
 ## 6. 组合数据（portfolio）
 
@@ -112,10 +128,10 @@ agent-rms history \
 `detail/exposure/performance` 仍使用 `--name`（支持产品代码和产品名称，优先产品代码精确匹配）。
 
 ```bash
-agent-rms portfolio overview
-agent-rms portfolio detail --name P001
-agent-rms portfolio exposure --name P001
-agent-rms portfolio performance --name P001 --start-date 2026-01-01 --end-date 2026-03-10
+uvx agent-rms portfolio overview
+uvx agent-rms portfolio detail --name P001
+uvx agent-rms portfolio exposure --name P001
+uvx agent-rms portfolio performance --name P001 --start-date 2026-01-01 --end-date 2026-03-10
 ```
 
 `detail` 输出包含两张表：
@@ -124,7 +140,7 @@ agent-rms portfolio performance --name P001 --start-date 2026-01-01 --end-date 2
 
 JSON 输出：
 ```bash
-agent-rms portfolio performance --name P001 --output json
+uvx agent-rms portfolio performance --name P001 --output json
 ```
 
 ## 7. 输出规则
@@ -139,10 +155,18 @@ agent-rms portfolio performance --name P001 --output json
 
 ## 8. AI Agent 推荐调用方式
 
-1. 首次执行 `agent-rms auth login` 建立凭证。
-2. 调试阶段先用表格（默认）观察字段。
-3. 机器消费时统一加 `--output json`，解析 `data` 字段。
-4. 若返回认证错误，重新执行 `agent-rms auth login`。
+最佳实践：
+
+1. 先执行 `git clone <repo-url>` 获取项目源码，再进入仓库目录执行 `uv tool install .`。
+2. 统一使用 `uvx agent-rms ...` 调用，不依赖当前 shell 是否激活虚拟环境。
+3. 首次执行 `uvx agent-rms auth login` 建立凭证。
+4. 调试阶段先用表格（默认）观察字段。
+5. 机器消费时统一加 `--output json`，解析 `data` 字段。
+6. 若返回认证错误，重新执行 `uvx agent-rms auth login`。
+
+补充说明：
+- 若已经把 uv 工具目录加入 `PATH`，也可以直接执行 `agent-rms ...`。
+- 对 Agent 来说，固定写成 `uvx agent-rms ...` 更稳妥，便于跨机器、跨 shell、跨会话复用。
 
 ## 9. 常见问题
 
@@ -152,7 +176,7 @@ agent-rms portfolio performance --name P001 --output json
 
 处理：
 ```bash
-agent-rms auth login ...
+uvx agent-rms auth login ...
 ```
 
 ### 2) Token 过期
@@ -161,7 +185,7 @@ agent-rms auth login ...
 
 处理：
 ```bash
-agent-rms auth login ...
+uvx agent-rms auth login ...
 ```
 
 ### 3) 组合名歧义
