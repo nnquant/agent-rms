@@ -1,0 +1,20 @@
+[project]
+name = "agent-rms"
+version = "0.1.0"
+description = "Standalone CLI package for AI agents to access RMS auth/market/history/portfolio data"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "click>=8.1.0",
+  "python-jose[cryptography]>=3.3.0",
+]
+
+[project.scripts]
+agent-rms = "agent_rms.main:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_rms"]
