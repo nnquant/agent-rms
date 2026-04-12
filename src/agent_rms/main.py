@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import click
 
-from .commands import auth, history, market, portfolio
+from .commands import auth, history, market, portfolio, quote
 
 
 @click.group()
@@ -17,6 +17,7 @@ cli.add_command(auth.auth)
 cli.add_command(market.market)
 cli.add_command(history.history)
 cli.add_command(portfolio.portfolio)
+cli.add_command(quote.quote)
 
 
 if __name__ == "__main__":

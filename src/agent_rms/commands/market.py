@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import re
 from typing import Any
 
@@ -36,6 +36,7 @@ _SWAP_SPREAD_PAIRS = [
     ("1Y", "5Y", "FR007_IRS 1x5"),
     ("2Y", "5Y", "FR007_IRS 2x5"),
 ]
+_MAIN_CONTRACT_LOOKBACK_DAYS = 45
 
 
 @click.group()
@@ -71,6 +72,10 @@ def _infer_symbol(code: str) -> str | None:
     if normalized.startswith("T"):
         return "T"
     return None
+
+
+def _normalize_contract_code(code: Any) -> str:
+    return str(code or "").strip().upper().split(".")[0]
 
 
 def _to_float(value: Any) -> float | None:
@@ -130,7 +135,52 @@ def _order_future_quote_fields(items: list[dict[str, Any]]) -> list[dict[str, An
     return ordered_rows
 
 
-def _latest_items_by_symbol(items: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+def _extract_history_rows(response: dict[str, Any]) -> list[dict[str, Any]]:
+    return _extract_items(response, key="rows")
+
+
+def _resolve_latest_history_code(rows: list[dict[str, Any]]) -> str | None:
+    sorted_rows = sorted(rows, key=lambda row: _parse_iso_ts(row.get("time")), reverse=True)
+    for row in sorted_rows:
+        ths_code = _normalize_contract_code(row.get("ths_code"))
+        if ths_code:
+            return ths_code
+    return None
+
+
+def _resolve_main_contract_codes(
+    session: dict[str, Any],
+    symbols: list[str],
+) -> dict[str, str]:
+    if not symbols:
+        return {}
+
+    end_time = datetime.now(timezone.utc).replace(microsecond=0)
+    start_time = end_time - timedelta(days=_MAIN_CONTRACT_LOOKBACK_DAYS)
+    preferred_codes: dict[str, str] = {}
+    for symbol in symbols:
+        try:
+            response = _market_get(
+                session,
+                "/market/bond_futures/history",
+                params={
+                    "symbol": symbol,
+                    "start_time": start_time.isoformat().replace("+00:00", "Z"),
+                    "end_time": end_time.isoformat().replace("+00:00", "Z"),
+                },
+            )
+        except click.ClickException:
+            continue
+        history_code = _resolve_latest_history_code(_extract_history_rows(response))
+        if history_code:
+            preferred_codes[symbol] = history_code
+    return preferred_codes
+
+
+def _latest_items_by_symbol(
+    items: list[dict[str, Any]],
+    preferred_codes: dict[str, str] | None = None,
+) -> dict[str, dict[str, Any]]:
     latest: dict[str, dict[str, Any]] = {}
     for item in items:
         instrument_code = str(item.get("instrument_code") or "")
@@ -143,18 +193,36 @@ def _latest_items_by_symbol(items: list[dict[str, Any]]) -> dict[str, dict[str, 
             latest[symbol] = item
             continue
 
+        existing_code = str(existing.get("instrument_code") or "")
+        preferred_code = (
+            _normalize_contract_code(preferred_codes.get(symbol))
+            if preferred_codes is not None and preferred_codes.get(symbol)
+            else ""
+        )
+        if preferred_code:
+            current_matches = _normalize_contract_code(instrument_code) == preferred_code
+            existing_matches = _normalize_contract_code(existing_code) == preferred_code
+            if current_matches and not existing_matches:
+                latest[symbol] = item
+                continue
+            if existing_matches and not current_matches:
+                continue
+
         current_ts = _parse_iso_ts(item.get("timestamp"))
         prev_ts = _parse_iso_ts(existing.get("timestamp"))
         if current_ts > prev_ts:
             latest[symbol] = item
             continue
-        if current_ts == prev_ts and instrument_code > str(existing.get("instrument_code") or ""):
+        if current_ts == prev_ts and instrument_code > existing_code:
             latest[symbol] = item
     return latest
 
 
-def _build_future_curve_levels(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    latest_map = _latest_items_by_symbol(items)
+def _build_future_curve_levels(
+    items: list[dict[str, Any]],
+    preferred_codes: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    latest_map = _latest_items_by_symbol(items, preferred_codes=preferred_codes)
     rows: list[dict[str, Any]] = []
     for symbol in _SYMBOL_ORDER:
         item = latest_map.get(symbol)
@@ -419,7 +487,11 @@ def future_curve(output: str, profile: str | None) -> None:
     except CliApiError as exc:
         raise click.ClickException(f"获取 future_curve 失败: {exc}") from exc
 
-    future_levels = _build_future_curve_levels(_extract_items(response))
+    preferred_codes = _resolve_main_contract_codes(session, list(_SYMBOL_ORDER))
+    future_levels = _build_future_curve_levels(
+        _extract_items(response),
+        preferred_codes=preferred_codes,
+    )
     emit_result(
         source="derived:future_curve_spreads",
         request={"profile": session["profile"]},
@@ -460,7 +532,11 @@ def asw_curve(output: str, profile: str | None) -> None:
     except CliApiError as exc:
         raise click.ClickException(f"获取 asw_curve 失败: {exc}") from exc
 
-    future_levels = _build_future_curve_levels(_extract_items(future_response))
+    preferred_codes = _resolve_main_contract_codes(session, list(_SYMBOL_ORDER))
+    future_levels = _build_future_curve_levels(
+        _extract_items(future_response),
+        preferred_codes=preferred_codes,
+    )
     swap_levels = _build_swap_curve_levels(_extract_items(swap_response))
     emit_result(
         source="derived:asw_curve",
@@ -487,7 +563,11 @@ def all_latest(output: str, profile: str | None) -> None:
     futures = _normalize_units_rows(_extract_items(futures_resp))
     swaps = _normalize_units_rows(_extract_items(swap_resp))
 
-    future_levels = _build_future_curve_levels(_extract_items(futures_resp))
+    preferred_codes = _resolve_main_contract_codes(session, list(_SYMBOL_ORDER))
+    future_levels = _build_future_curve_levels(
+        _extract_items(futures_resp),
+        preferred_codes=preferred_codes,
+    )
     swap_levels = _build_swap_curve_levels(_extract_items(swap_resp))
 
     emit_result(

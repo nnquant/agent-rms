@@ -91,6 +91,9 @@ uvx agent-rms market swap_curve
 uvx agent-rms market asw_curve
 ```
 
+补充说明：
+- `future_curve`、`asw_curve`、`market all` 会优先参考 `/market/bond_futures/history` 最近主力历史来选当前主力合约，而不是简单按远月合约代码排序。
+
 JSON 输出示例：
 ```bash
 uvx agent-rms market asw_curve --output json
@@ -122,7 +125,47 @@ uvx agent-rms history \
 
 若不传 `--pair`，会返回全部互换利差对；当前支持 `1x2`、`1x5`、`2x5`。底层数据源仍通过 `--curve` 和 `--quote-type` 控制，默认是 `FR007` + `mid`。
 
-## 6. 组合数据（portfolio）
+## 6. 行情录入（quote）
+
+`quote` 直接调用业务后端的行情录入 API，支持 AI 草稿和直提两种模式。
+
+### 创建草稿
+```bash
+uvx agent-rms quote draft \
+  --instrument-code IRS_5Y_PAY \
+  --template irs \
+  --last-price 1.9200 \
+  --bid-price 1.9100 \
+  --ask-price 1.9300
+```
+
+### 直接提交并生效
+```bash
+uvx agent-rms quote submit \
+  --instrument-code BOND_240210 \
+  --template bond \
+  --last-yield 1.8800 \
+  --cover-minutes 15
+```
+
+### 确认草稿
+```bash
+uvx agent-rms quote confirm --entry-id 18
+```
+
+### 查看录入记录与当前有效行情
+```bash
+uvx agent-rms quote list --instrument-code IRS_5Y_PAY
+uvx agent-rms quote effective --instrument-code IRS_5Y_PAY
+```
+
+字段规则：
+- `irs`：`--last-price` 必填，`--bid-price/--ask-price` 可选
+- `bond`：`--last-yield` 必填，`--last-clean-price` 可选
+- `--cover-minutes` 默认 `10`
+- `--source` 默认 `agent`，也可显式传 `manual`
+
+## 7. 组合数据（portfolio）
 
 `overview` 默认返回当前账号可访问的全部组合，不需要 `--name`。
 `detail/exposure/performance` 仍使用 `--name`（支持产品代码和产品名称，优先产品代码精确匹配）。
@@ -143,7 +186,7 @@ JSON 输出：
 uvx agent-rms portfolio performance --name P001 --output json
 ```
 
-## 7. 输出规则
+## 8. 输出规则
 
 - 默认：`--output table`
 - 可选：`--output json`
@@ -153,7 +196,7 @@ uvx agent-rms portfolio performance --name P001 --output json
 - 利率/收益率/比率/价差：4 位小数
 - 数量类：整数展示
 
-## 8. AI Agent 推荐调用方式
+## 9. AI Agent 推荐调用方式
 
 最佳实践：
 
@@ -168,7 +211,7 @@ uvx agent-rms portfolio performance --name P001 --output json
 - 若已经把 uv 工具目录加入 `PATH`，也可以直接执行 `agent-rms ...`。
 - 对 Agent 来说，固定写成 `uvx agent-rms ...` 更稳妥，便于跨机器、跨 shell、跨会话复用。
 
-## 9. 常见问题
+## 10. 常见问题
 
 ### 1) 未找到 profile 凭证
 报错示例：

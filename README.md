@@ -16,6 +16,7 @@ uvx agent-rms --help
 提供以下能力：
 - `agent-rms auth`：登录与本地凭证管理
 - `agent-rms market`：最新市场数据（all/future/swap/future_curve/swap_curve/asw_curve）
+- `agent-rms quote`：行情录入与有效行情查询（draft/submit/confirm/list/effective）
 - `agent-rms history`：历史数据查询
 - `agent-rms portfolio`：组合数据（overview/detail/exposure/performance）
 
