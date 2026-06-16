@@ -17,6 +17,7 @@ uvx agent-rms --help
 - `agent-rms auth`：登录与本地凭证管理
 - `agent-rms market`：最新市场数据（all/future/swap/future_curve/swap_curve/asw_curve）
 - `agent-rms quote`：行情录入与有效行情查询（draft/submit/confirm/list/effective）
+- `agent-rms trade`：期货手工交易录入、修改与删除（create/update/delete）
 - `agent-rms history`：历史数据查询
 - `agent-rms portfolio`：组合数据（overview/detail/exposure/performance）
 

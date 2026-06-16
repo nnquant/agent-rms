@@ -186,7 +186,59 @@ JSON 输出：
 uvx agent-rms portfolio performance --name P001 --output json
 ```
 
-## 8. 输出规则
+## 8. 期货手工交易（trade）
+
+`trade` 命令只覆盖现有后端支持的期货手工交易，不处理 IRS 或现券交易生命周期。
+后端仍是权限、产品范围、合约类型、当日未结算边界和已结算保护的最终校验方。
+
+### 创建期货手工成交
+```bash
+uvx agent-rms trade create \
+  --product-code PROD001 \
+  --trade-code FUT_AGENT_001 \
+  --instrument-code T2606 \
+  --account-code ACC001 \
+  --strategy-code STR001 \
+  --trade-time 2026-06-16T09:30:00+08:00 \
+  --price 101.25 \
+  --quantity 2
+```
+
+### 修改当日未结算期货成交
+```bash
+uvx agent-rms trade update \
+  --product-code PROD001 \
+  --trade-code FUT_AGENT_001 \
+  --instrument-code TF2606 \
+  --account-code ACC002 \
+  --strategy-code STR002 \
+  --trade-time 2026-06-16T13:15:00+08:00 \
+  --price 102.75 \
+  --quantity -3
+```
+
+### 删除当日未结算期货成交
+删除是破坏性操作，必须显式传 `--yes`：
+```bash
+uvx agent-rms trade delete \
+  --product-code PROD001 \
+  --trade-code FUT_AGENT_001 \
+  --yes
+```
+
+### 输入校验规则
+- `product-code/trade-code/instrument-code/account-code/strategy-code` 不允许为空或纯空格。
+- `price` 必须大于 `0`。
+- `quantity` 不能为 `0`；买入用正数，卖出用负数。
+- `trade-time` 必须是带 timezone 的 ISO8601 时间，例如 `2026-06-16T09:30:00+08:00`。
+- 删除必须传 `--yes`，否则不会发送后端请求。
+
+常见后端拒绝：
+- `Only same-day futures trades can be modified`：只能维护当日未结算期货成交；历史错误应新增更正成交。
+- `Settled futures trades cannot be modified`：已结算成交不能编辑或删除，需要走调整流程。
+- `Only FUTURE trades are supported`：本命令只支持期货合约。
+
+## 9. 输出规则
 
 - 默认：`--output table`
 - 可选：`--output json`
@@ -196,7 +248,7 @@ uvx agent-rms portfolio performance --name P001 --output json
 - 利率/收益率/比率/价差：4 位小数
 - 数量类：整数展示
 
-## 9. AI Agent 推荐调用方式
+## 10. AI Agent 推荐调用方式
 
 最佳实践：
 
@@ -211,7 +263,7 @@ uvx agent-rms portfolio performance --name P001 --output json
 - 若已经把 uv 工具目录加入 `PATH`，也可以直接执行 `agent-rms ...`。
 - 对 Agent 来说，固定写成 `uvx agent-rms ...` 更稳妥，便于跨机器、跨 shell、跨会话复用。
 
-## 10. 常见问题
+## 11. 常见问题
 
 ### 1) 未找到 profile 凭证
 报错示例：

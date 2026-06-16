@@ -1,7 +1,7 @@
 [project]
 name = "agent-rms"
 version = "0.1.0"
-description = "Standalone CLI package for AI agents to access RMS auth/market/history/portfolio data"
+description = "Standalone CLI package for AI agents to access RMS auth/market/trade/history/portfolio data"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

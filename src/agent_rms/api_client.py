@@ -98,3 +98,14 @@ class ApiClient:
         params: dict[str, Any] | None = None,
     ) -> Any:
         return self.request("POST", path, params=params, json_body=json_body)
+
+    def patch(
+        self,
+        path: str,
+        json_body: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> Any:
+        return self.request("PATCH", path, params=params, json_body=json_body)
+
+    def delete(self, path: str, params: dict[str, Any] | None = None) -> Any:
+        return self.request("DELETE", path, params=params)
